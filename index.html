@@ -1051,10 +1051,15 @@ ${encodedData}
             document.getElementById('textModalTitle').textContent = '📱 Load Data from Text';
             document.getElementById('textModalContent').innerHTML = `
                 <p><strong>Paste the data code here:</strong></p>
-                <textarea id="dataCodeInput" style="width: 100%; height: 200px; font-size: 14px; padding: 10px;" placeholder="Paste the data code from WhatsApp here..."></textarea>
+                <p style="color: #666; font-size: 14px;">Copy the long code from the WhatsApp message and paste it below:</p>
+                <textarea id="dataCodeInput" style="width: 100%; height: 200px; font-size: 14px; padding: 10px; border: 2px solid #ddd; border-radius: 5px;" placeholder="Paste the data code from WhatsApp here..."></textarea>
                 <br><br>
-                <button class="btn" onclick="processTextData()">📥 Load Data</button>
-                <button class="admin-btn" onclick="closeTextModal()">Cancel</button>
+                <button class="btn" onclick="processTextData()" style="margin-right: 10px;">📥 Load Data</button>
+                <button class="admin-btn" onclick="closeTextModal()">❌ Cancel</button>
+                <br><br>
+                <div style="background: #e7f3ff; padding: 10px; border-radius: 5px; font-size: 13px;">
+                    <strong>💡 Tip:</strong> The data code is the long text that starts with letters and numbers from the WhatsApp message.
+                </div>
             `;
             document.getElementById('textDataModal').style.display = 'block';
         }
@@ -1062,25 +1067,69 @@ ${encodedData}
         function processTextData() {
             const input = document.getElementById('dataCodeInput').value.trim();
             
+            if (!input) {
+                showStatus('❌ Please paste the data code first.', 'error');
+                return;
+            }
+
             try {
-                // Try to decode base64 data
-                const decodedData = JSON.parse(atob(input));
+                // Show loading state
+                const loadButton = event.target;
+                loadButton.textContent = '⏳ Loading...';
+                loadButton.disabled = true;
                 
-                if (decodedData.donations && decodedData.expenses) {
-                    if (confirm(`Load data shared on ${decodedData.shared_date}? This will replace your current data.`)) {
-                        donations = decodedData.donations;
-                        expenses = decodedData.expenses;
-                        saveToLocalStorage();
-                        updateTables();
-                        updateSummary();
-                        closeTextModal();
-                        showStatus('✅ Data loaded successfully!', 'success');
-                    }
-                } else {
-                    throw new Error('Invalid data format');
+                // Try to decode base64 data
+                let decodedData;
+                try {
+                    decodedData = JSON.parse(atob(input));
+                } catch (decodeError) {
+                    throw new Error('Invalid data code format');
                 }
+                
+                // Validate data structure
+                if (!decodedData || typeof decodedData !== 'object') {
+                    throw new Error('Invalid data structure');
+                }
+                
+                if (!Array.isArray(decodedData.donations) || !Array.isArray(decodedData.expenses)) {
+                    throw new Error('Missing donations or expenses data');
+                }
+                
+                const confirmMessage = decodedData.shared_date 
+                    ? `Load data shared on ${decodedData.shared_date}? This will replace your current data.`
+                    : 'Load this data? This will replace your current data.';
+                
+                if (confirm(confirmMessage)) {
+                    // Load the data
+                    donations = decodedData.donations || [];
+                    expenses = decodedData.expenses || [];
+                    
+                    // Save to local storage
+                    saveToLocalStorage();
+                    
+                    // Update the UI
+                    updateTables();
+                    updateSummary();
+                    
+                    // Close modal and show success
+                    closeTextModal();
+                    showStatus(`✅ Data loaded successfully! ${donations.length} donations and ${expenses.length} expenses imported.`, 'success');
+                } else {
+                    // Reset button state if user cancels
+                    loadButton.textContent = '📥 Load Data';
+                    loadButton.disabled = false;
+                }
+                
             } catch (error) {
-                showStatus('❌ Invalid data code. Please check and try again.', 'error');
+                console.error('Error loading data:', error);
+                showStatus(`❌ Error: ${error.message}. Please check the data code and try again.`, 'error');
+                
+                // Reset button state
+                const loadButton = document.querySelector('#textModalContent .btn');
+                if (loadButton) {
+                    loadButton.textContent = '📥 Load Data';
+                    loadButton.disabled = false;
+                }
             }
         }
 
@@ -1106,6 +1155,35 @@ ${encodedData}
         function shareWhatsAppData(text) {
             const whatsappUrl = `https://wa.me/?text=${text}`;
             window.open(whatsappUrl, '_blank');
+        }
+
+        // Test function to generate sample data for testing
+        function generateTestData() {
+            if (confirm('Add sample data for testing?')) {
+                donations = [
+                    { id: 1, donor: 'Test Donor 1', amount: 1000, date: '2025-08-22', receivedBy: 'Admin', type: 'cash' },
+                    { id: 2, donor: 'Test Donor 2', amount: 2000, date: '2025-08-22', receivedBy: 'Admin', type: 'upi' }
+                ];
+                expenses = [
+                    { id: 1, item: 'Test Expense 1', amount: 500, date: '2025-08-22', purchasedBy: 'Admin' }
+                ];
+                saveToLocalStorage();
+                updateTables();
+                updateSummary();
+                showStatus('✅ Test data added!', 'success');
+            }
+        }
+
+        // Debug function to check if core functions exist
+        function checkFunctions() {
+            const functions = ['saveToLocalStorage', 'updateTables', 'updateSummary', 'showStatus'];
+            functions.forEach(func => {
+                if (typeof window[func] === 'function') {
+                    console.log(`✅ ${func} exists`);
+                } else {
+                    console.log(`❌ ${func} missing`);
+                }
+            });
         }
     </script>
 </body>
