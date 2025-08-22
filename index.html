@@ -404,14 +404,24 @@
                     <button class="admin-btn" onclick="enableViewOnlyMode()">Enable View-Only Mode</button>
                     <button class="admin-btn" onclick="exportData()">💾 Export Data</button>
                     <button class="admin-btn" onclick="importData()">📂 Import Data</button>
+                    <button class="admin-btn" onclick="shareDataText()">📱 Share as Text</button>
+                    <button class="admin-btn" onclick="loadFromText()">📝 Load from Text</button>
                     <input type="file" id="importFile" style="display: none;" accept=".json" onchange="handleImport(event)">
                 </div>
                 <p id="modeStatus">Current Mode: <span id="currentMode">Admin Mode</span></p>
                 <div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 10px; border-left: 4px solid #ffc107;">
-                    <strong>📝 Data Sharing:</strong> Each device stores its own data. To share updates:
-                    <br>1. Admin exports data after adding entries
-                    <br>2. Share the exported file with village
-                    <br>3. Others import the file to see latest data
+                    <strong>📝 Data Sharing Options:</strong><br>
+                    <strong>Method 1 (Mobile-Friendly):</strong> Use "Share as Text" → Copy → Share in WhatsApp → Others use "Load from Text"<br>
+                    <strong>Method 2 (Advanced):</strong> Export JSON file → Share file → Others import file
+                </div>
+            </div>
+
+            <!-- Text Data Modal -->
+            <div id="textDataModal" class="modal">
+                <div class="modal-content">
+                    <span class="close" onclick="closeTextModal()">&times;</span>
+                    <h3 id="textModalTitle">📱 Mobile-Friendly Data Sharing</h3>
+                    <div id="textModalContent"></div>
                 </div>
             </div>
 
@@ -985,9 +995,117 @@
         // Close modal when clicking outside
         window.onclick = function(event) {
             const modal = document.getElementById('editModal');
+            const textModal = document.getElementById('textDataModal');
             if (event.target === modal) {
                 closeEditModal();
             }
+            if (event.target === textModal) {
+                closeTextModal();
+            }
+        }
+
+        // Mobile-friendly data sharing functions
+        function shareDataText() {
+            const data = {
+                donations: donations,
+                expenses: expenses,
+                shared_date: new Date().toISOString().split('T')[0],
+                shared_time: new Date().toLocaleTimeString()
+            };
+            
+            // Encode data as base64 for easy sharing
+            const encodedData = btoa(JSON.stringify(data));
+            
+            const textToShare = `🐘 VINAYAKA FESTIVAL DATA 🐘
+📅 Shared: ${data.shared_date} at ${data.shared_time}
+📍 PINNINTIPALEM Village
+
+📊 SUMMARY:
+💰 Total Donations: ₹${donations.reduce((sum, d) => sum + d.amount, 0).toLocaleString()}
+💸 Total Expenses: ₹${expenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString()}
+💵 Balance: ₹${(donations.reduce((sum, d) => sum + d.amount, 0) - expenses.reduce((sum, e) => sum + e.amount, 0)).toLocaleString()}
+
+🔐 DATA CODE (Copy this):
+${encodedData}
+
+📱 To use this data:
+1. Open festival website
+2. Click "Load from Text" 
+3. Paste this code
+4. All data will be loaded!
+
+🙏 Jai Ganesh! 🎊`;
+
+            document.getElementById('textModalTitle').textContent = '📱 Share This Data';
+            document.getElementById('textModalContent').innerHTML = `
+                <p><strong>Copy this text and share in WhatsApp:</strong></p>
+                <textarea style="width: 100%; height: 300px; font-size: 12px; padding: 10px;" readonly>${textToShare}</textarea>
+                <br><br>
+                <button class="btn" onclick="copyToClipboard('${textToShare.replace(/'/g, "\\'")}')">📋 Copy Text</button>
+                <button class="btn" onclick="shareWhatsAppData('${encodeURIComponent(textToShare)}')">📱 Share on WhatsApp</button>
+            `;
+            document.getElementById('textDataModal').style.display = 'block';
+        }
+
+        function loadFromText() {
+            document.getElementById('textModalTitle').textContent = '📱 Load Data from Text';
+            document.getElementById('textModalContent').innerHTML = `
+                <p><strong>Paste the data code here:</strong></p>
+                <textarea id="dataCodeInput" style="width: 100%; height: 200px; font-size: 14px; padding: 10px;" placeholder="Paste the data code from WhatsApp here..."></textarea>
+                <br><br>
+                <button class="btn" onclick="processTextData()">📥 Load Data</button>
+                <button class="admin-btn" onclick="closeTextModal()">Cancel</button>
+            `;
+            document.getElementById('textDataModal').style.display = 'block';
+        }
+
+        function processTextData() {
+            const input = document.getElementById('dataCodeInput').value.trim();
+            
+            try {
+                // Try to decode base64 data
+                const decodedData = JSON.parse(atob(input));
+                
+                if (decodedData.donations && decodedData.expenses) {
+                    if (confirm(`Load data shared on ${decodedData.shared_date}? This will replace your current data.`)) {
+                        donations = decodedData.donations;
+                        expenses = decodedData.expenses;
+                        saveToLocalStorage();
+                        updateTables();
+                        updateSummary();
+                        closeTextModal();
+                        showStatus('✅ Data loaded successfully!', 'success');
+                    }
+                } else {
+                    throw new Error('Invalid data format');
+                }
+            } catch (error) {
+                showStatus('❌ Invalid data code. Please check and try again.', 'error');
+            }
+        }
+
+        function closeTextModal() {
+            document.getElementById('textDataModal').style.display = 'none';
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(function() {
+                showStatus('📋 Text copied! You can now paste it in WhatsApp.', 'success');
+            }).catch(function() {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showStatus('📋 Text copied! You can now paste it in WhatsApp.', 'success');
+            });
+        }
+
+        function shareWhatsAppData(text) {
+            const whatsappUrl = `https://wa.me/?text=${text}`;
+            window.open(whatsappUrl, '_blank');
         }
     </script>
 </body>
